@@ -50,40 +50,47 @@ do not serve the production nginx CSP.
 
 ### Fix (per deployment)
 
-Current CloudTAK (`api/nginx.conf.js`) already supports appending CSP sources
-via env. Allow the Blitzortung websocket hosts:
+**1. Prefer env (newer CloudTAK only)** — if `api/nginx.conf.js` contains
+`NGINX_CSP_`, allow the hosts and recreate the API container:
 
 ```bash
-NGINX_CSP_CONNECT_SRC=wss://*.blitzortung.org
-```
-
-Then recreate the API container so nginx regenerates its config, e.g.:
-
-```bash
+NGINX_CSP_CONNECT_SRC=wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org
 docker compose up -d cloudtak-api --force-recreate
 ```
 
-Verify:
-
-```bash
-curl -sI https://cloudtak.example.com/ | grep -i content-security-policy
-```
-
-You should see `wss://*.blitzortung.org` inside `connect-src`.
-
-### Prefer not to touch `.env`?
-
-Put it on the service in compose (version-controlled, no secrets file change):
+Or in compose (avoids editing `.env`):
 
 ```yaml
 cloudtak-api:
-  env_file: .env
   environment:
-    NGINX_CSP_CONNECT_SRC: wss://*.blitzortung.org
+    NGINX_CSP_CONNECT_SRC: wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org
 ```
 
-`environment:` overrides/extends what the container sees; recreate
-`cloudtak-api` after editing compose.
+**2. Older CloudTAK (no `NGINX_CSP_` in `nginx.conf.js`)** — the env var is
+**ignored**. Edit `CloudTAK/api/nginx.conf.js` on that host:
+
+```js
+'connect-src': [`'self'`, 'wss://ws1.blitzortung.org', 'wss://ws7.blitzortung.org', 'wss://ws8.blitzortung.org']
+```
+
+Then rebuild and recreate (must not be a fully cached no-op):
+
+```bash
+docker compose build cloudtak-api --no-cache
+docker compose up -d cloudtak-api --force-recreate
+```
+
+**Verify** (must show `blitzortung` in `connect-src`):
+
+```bash
+curl -sI https://cloudtak.example.com/ | tr -d '\r' | grep -i content-security-policy
+```
+
+Quick check that the image supports the env approach:
+
+```bash
+docker exec cloudtak-api grep -n NGINX_CSP /home/etl/api/nginx.conf.js || echo 'old CloudTAK — patch nginx.conf.js instead'
+```
 
 ### Why not a plugin setting?
 
@@ -91,11 +98,13 @@ cloudtak-api:
 |------|--------|
 | Plugin / browser / admin UI toggle | No — cannot change HTTP CSP headers |
 | CORS / “whitelist origin” admin | No — wrong mechanism |
-| `NGINX_CSP_CONNECT_SRC` (or compose `environment`) | Yes |
+| `NGINX_CSP_CONNECT_SRC` (newer CloudTAK) | Yes |
+| Hardcode hosts in `api/nginx.conf.js` + rebuild (older CloudTAK) | Yes |
 | Same-origin server proxy for Blitzortung | Yes, but needs a backend route outside this plugin |
 
-Replicate the env (or compose `environment` line) on every host that runs this
-plugin. Installing the plugin alone is not enough.
+Replicate the CSP change on every host that runs this plugin. Installing the
+plugin alone is not enough. After a CloudTAK upgrade, re-check whether the
+`nginx.conf.js` edit was overwritten and whether `NGINX_CSP_*` is available.
 
 ## How it works
 
