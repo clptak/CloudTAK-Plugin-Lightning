@@ -93,10 +93,85 @@
 
             <div class='card mb-3'>
                 <div class='card-body'>
+                    <h4 class='card-title mb-3'>
+                        CoT Markers
+                    </h4>
+
+                    <label class='form-check mb-2'>
+                        <input
+                            v-model='state.settings.publishCot'
+                            class='form-check-input'
+                            type='checkbox'
+                            :disabled='state.running'
+                            @change='onSettingsChange'
+                        >
+                        <span class='form-check-label'>
+                            Publish CoT markers to map
+                        </span>
+                    </label>
+
+                    <template v-if='state.settings.publishCot'>
+                        <div class='mb-2'>
+                            <label class='form-label small'>Destination</label>
+                            <div class='d-flex gap-3'>
+                                <label class='form-check'>
+                                    <input
+                                        v-model='state.settings.cotDestination'
+                                        class='form-check-input'
+                                        type='radio'
+                                        value='local'
+                                        :disabled='state.running'
+                                        @change='onSettingsChange'
+                                    >
+                                    <span class='form-check-label'>Local</span>
+                                </label>
+                                <label class='form-check'>
+                                    <input
+                                        v-model='state.settings.cotDestination'
+                                        class='form-check-input'
+                                        type='radio'
+                                        value='mission'
+                                        :disabled='state.running'
+                                        @change='onCotDestinationChange'
+                                    >
+                                    <span class='form-check-label'>Mission</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div v-if='state.settings.cotDestination === "mission"'>
+                            <label class='form-label small'>DataSync mission</label>
+                            <select
+                                :value='state.settings.missionGuid ?? ""'
+                                class='form-select'
+                                :disabled='state.running || !missions.length'
+                                @change='onMissionSelect'
+                            >
+                                <option value=''>
+                                    {{ missions.length ? 'Select a mission…' : 'No subscribed missions' }}
+                                </option>
+                                <option
+                                    v-for='m in missions'
+                                    :key='m.guid'
+                                    :value='m.guid'
+                                    v-text='m.name'
+                                />
+                            </select>
+                            <p class='text-secondary small mt-2 mb-0'>
+                                Subscribe to a mission on the map first (Menu → Missions → Subscribe).
+                                CoT markers use the strike lifetime above as their stale time.
+                            </p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class='card mb-3'>
+                <div class='card-body'>
                     <button
                         v-if='!state.running'
                         class='btn btn-primary w-100'
-                        :disabled='state.settings.centerLat === null || state.settings.centerLon === null'
+                        :disabled='!canStart'
                         @click='start()'
                     >
                         Start Monitoring
@@ -121,6 +196,12 @@
                         v-if='state.error'
                         class='text-danger small mt-2'
                         v-text='state.error'
+                    />
+
+                    <div
+                        v-if='missionGateHint'
+                        class='text-warning small mt-2'
+                        v-text='missionGateHint'
                     />
 
                     <div class='d-flex justify-content-between mt-3 small'>
@@ -161,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useAppStore } from '@/stores/app.ts';
 import StrikeHistoryPane from './StrikeHistoryPane.vue';
 import {
@@ -174,9 +255,44 @@ import {
     drawFence,
     openHistoryPane
 } from './lightning.ts';
+import {
+    hasSubscribedMission,
+    listSubscribedMissions,
+    type SubscribedMission
+} from './missions.ts';
 
 const appStore = useAppStore();
 const isMobile = computed(() => appStore.isMobileDetected);
+const missions = ref<SubscribedMission[]>([]);
+
+const missionOk = computed(() => {
+    if (!state.settings.publishCot) return true;
+    if (state.settings.cotDestination !== 'mission') return true;
+    return hasSubscribedMission(state.settings.missionGuid);
+});
+
+const canStart = computed(() => {
+    if (state.settings.centerLat === null || state.settings.centerLon === null) {
+        return false;
+    }
+    return missionOk.value;
+});
+
+const missionGateHint = computed(() => {
+    if (state.running || !state.settings.publishCot) return '';
+    if (state.settings.cotDestination !== 'mission') return '';
+    if (missionOk.value) return '';
+    return 'Select a subscribed DataSync mission before starting.';
+});
+
+function refreshMissions(): void {
+    missions.value = listSubscribedMissions();
+    const guid = state.settings.missionGuid;
+    if (guid && !hasSubscribedMission(guid)) {
+        state.settings.missionGuid = null;
+        saveSettings();
+    }
+}
 
 function onPick(): void {
     if (state.picking) {
@@ -190,6 +306,21 @@ function onSettingsChange(): void {
     saveSettings();
     drawFence();
 }
+
+function onCotDestinationChange(): void {
+    refreshMissions();
+    onSettingsChange();
+}
+
+function onMissionSelect(evt: Event): void {
+    const value = (evt.target as HTMLSelectElement).value;
+    state.settings.missionGuid = value || null;
+    onSettingsChange();
+}
+
+onMounted(() => {
+    refreshMissions();
+});
 </script>
 
 <style scoped>

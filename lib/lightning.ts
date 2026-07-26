@@ -10,6 +10,7 @@ import type { PluginAPI } from '../../../plugin.ts';
 import type { GeoJSONSource } from 'maplibre-gl';
 import { useAppStore } from '@/stores/app.ts';
 import { useMapStore } from '@/stores/map.ts';
+import { hasSubscribedMission } from './missions.ts';
 
 export interface Strike {
     id: string;
@@ -20,11 +21,16 @@ export interface Strike {
     compass: string;
 }
 
+export type CotDestination = 'local' | 'mission';
+
 export interface LightningSettings {
     centerLat: number | null;
     centerLon: number | null;
     radiusMi: number;
     staleSec: number;
+    publishCot: boolean;
+    cotDestination: CotDestination;
+    missionGuid: string | null;
 }
 
 const LS_KEY = 'plugin-lightning-settings';
@@ -58,19 +64,28 @@ export const state = reactive({
     settings: loadSettings()
 });
 
-function loadSettings(): LightningSettings {
-    try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw) return JSON.parse(raw) as LightningSettings;
-    } catch (err) {
-        console.warn('Lightning Plugin: failed to load settings', err);
-    }
+function defaultSettings(): LightningSettings {
     return {
         centerLat: null,
         centerLon: null,
         radiusMi: 20,
-        staleSec: 120
+        staleSec: 120,
+        publishCot: false,
+        cotDestination: 'local',
+        missionGuid: null
     };
+}
+
+function loadSettings(): LightningSettings {
+    try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+            return { ...defaultSettings(), ...(JSON.parse(raw) as Partial<LightningSettings>) };
+        }
+    } catch (err) {
+        console.warn('Lightning Plugin: failed to load settings', err);
+    }
+    return defaultSettings();
 }
 
 export function saveSettings(): void {
@@ -173,6 +188,11 @@ export function init(pluginAPI: PluginAPI): void {
     api = pluginAPI;
 }
 
+/** PluginAPI set in enable()/init — needed for pinia outside Vue setup. */
+export function getPluginApi(): PluginAPI | null {
+    return api;
+}
+
 /**
  * Prefer live device GPS from CloudTAK's map store; fall back to the
  * configured filter center.
@@ -244,6 +264,14 @@ export function start(): void {
     if (!api) return;
     if (state.settings.centerLat === null || state.settings.centerLon === null) {
         state.error = 'Set a center point first';
+        return;
+    }
+    if (
+        state.settings.publishCot
+        && state.settings.cotDestination === 'mission'
+        && !hasSubscribedMission(state.settings.missionGuid)
+    ) {
+        state.error = 'Select a subscribed DataSync mission for CoT publishing';
         return;
     }
 
@@ -361,16 +389,24 @@ function onStrike(lat: number, lon: number, timeMs: number): void {
     if (distM > radiusMi * 1609.344) return;
 
     state.totalSeen++;
-    state.strikes.push({
+    const strike: Strike = {
         id: `${timeMs}-${Math.round(lat * 1e4)}-${Math.round(lon * 1e4)}`,
         lat,
         lon,
         timeMs,
         distMi: distM / 1609.344,
         compass: bearingCompass(centerLat, centerLon, lat, lon)
-    });
+    };
+    state.strikes.push(strike);
 
     renderStrikes();
+
+    if (state.settings.publishCot) {
+        // Dynamic import avoids a circular dependency with cot-publish.ts
+        void import('./cot-publish.ts').then((m) => {
+            void m.publishStrikeCot(strike);
+        });
+    }
 }
 
 function pruneStrikes(): void {
