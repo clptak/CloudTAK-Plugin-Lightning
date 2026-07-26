@@ -37,21 +37,65 @@ web build.
 
 ## ⚠️ Production requirement: CSP allowance for the Blitzortung websocket
 
-Production CloudTAK's nginx ships a Content-Security-Policy with
-`connect-src 'self'` (plus the API host). A browser WebSocket to
-`wss://ws*.blitzortung.org` is **blocked by that CSP** — the Start button will
-silently fail on a stock production deployment. Local dev builds work because
-they don't pass through the nginx CSP.
+This is a **Content-Security-Policy (CSP)** restriction, **not** CORS, and it
+**cannot** be configured from the CloudTAK UI, admin panel, or this plugin’s
+settings. Plugins are frontend-only; CSP is set by nginx inside `cloudtak-api`
+when the container starts. A browser setting cannot loosen that header.
 
-`upstream/cloudtak-csp-connect-extra.patch` in this repo patches
-`api/nginx.conf.js` to support an env-configurable extension:
+### Symptom
+
+Feed stays on **Connecting…**. DevTools Console shows a `connect-src` violation
+for `wss://ws*.blitzortung.org`. Local Vite/dev builds often work because they
+do not serve the production nginx CSP.
+
+### Fix (per deployment)
+
+Current CloudTAK (`api/nginx.conf.js`) already supports appending CSP sources
+via env. Allow the Blitzortung websocket hosts:
 
 ```bash
-CSP_CONNECT_EXTRA="wss://*.blitzortung.org"
+NGINX_CSP_CONNECT_SRC=wss://*.blitzortung.org
 ```
 
-Until that (or an equivalent) lands upstream in dfpc-coe/CloudTAK, treat this
-plugin as **dev-build-only**, or carry the patch in your own CloudTAK build.
+Then recreate the API container so nginx regenerates its config, e.g.:
+
+```bash
+docker compose up -d cloudtak-api --force-recreate
+```
+
+Verify:
+
+```bash
+curl -sI https://cloudtak.example.com/ | grep -i content-security-policy
+```
+
+You should see `wss://*.blitzortung.org` inside `connect-src`.
+
+### Prefer not to touch `.env`?
+
+Put it on the service in compose (version-controlled, no secrets file change):
+
+```yaml
+cloudtak-api:
+  env_file: .env
+  environment:
+    NGINX_CSP_CONNECT_SRC: wss://*.blitzortung.org
+```
+
+`environment:` overrides/extends what the container sees; recreate
+`cloudtak-api` after editing compose.
+
+### Why not a plugin setting?
+
+| Idea | Works? |
+|------|--------|
+| Plugin / browser / admin UI toggle | No — cannot change HTTP CSP headers |
+| CORS / “whitelist origin” admin | No — wrong mechanism |
+| `NGINX_CSP_CONNECT_SRC` (or compose `environment`) | Yes |
+| Same-origin server proxy for Blitzortung | Yes, but needs a backend route outside this plugin |
+
+Replicate the env (or compose `environment` line) on every host that runs this
+plugin. Installing the plugin alone is not enough.
 
 ## How it works
 
