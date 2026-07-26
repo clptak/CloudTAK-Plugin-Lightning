@@ -51,6 +51,8 @@ function buildStrikeFeature(strike: Strike): Feature {
     const remarks = Number.isFinite(rel.distMi)
         ? `${rel.distMi.toFixed(1)} mi ${rel.compass}`
         : 'None';
+    const local = new Date(strike.timeMs);
+    const hhmm = `${String(local.getHours()).padStart(2, '0')}:${String(local.getMinutes()).padStart(2, '0')}`;
 
     return {
         id,
@@ -61,7 +63,7 @@ function buildStrikeFeature(strike: Strike): Feature {
             type: SIDC,
             how: 'h-g-i-g-o',
             archived: true,
-            callsign: 'Lightning Strike',
+            callsign: `Lightning ${hhmm}`,
             time,
             start: time,
             stale,
