@@ -1,6 +1,6 @@
 import type { App } from 'vue';
 import { h } from 'vue';
-import type { PluginAPI, PluginInstance } from '@tak-ps/cloudtak';
+import type { PluginAPI, PluginInstance } from '../../plugin.ts';
 import { TablerDropdown } from '@tak-ps/vue-tabler';
 import MenuTemplate from './lib/MenuTemplate.vue';
 import LightningContainer from './lib/LightningContainer.vue';

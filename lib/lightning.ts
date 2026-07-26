@@ -6,7 +6,7 @@
  * use only — not an authoritative lightning data service.
  */
 import { reactive } from 'vue';
-import type { PluginAPI } from '@tak-ps/cloudtak';
+import type { PluginAPI } from '../../../plugin.ts';
 import type { GeoJSONSource } from 'maplibre-gl';
 
 export interface Strike {

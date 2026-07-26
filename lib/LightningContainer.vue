@@ -3,7 +3,9 @@
         <div class='card-body'>
             <div class='card mb-3'>
                 <div class='card-body'>
-                    <h3 class='card-title mb-2'>Lightning Monitor</h3>
+                    <h3 class='card-title mb-2'>
+                        Lightning Monitor
+                    </h3>
                     <p class='text-secondary small mb-0'>
                         Live strikes from Blitzortung.org within a radius of your chosen
                         center point. Data by Blitzortung.org &amp; contributors —
@@ -14,7 +16,9 @@
 
             <div class='card mb-3'>
                 <div class='card-body'>
-                    <h4 class='card-title mb-3'>Center Point</h4>
+                    <h4 class='card-title mb-3'>
+                        Center Point
+                    </h4>
 
                     <div class='row g-2 mb-2'>
                         <div class='col-6'>
@@ -55,7 +59,9 @@
 
             <div class='card mb-3'>
                 <div class='card-body'>
-                    <h4 class='card-title mb-3'>Filter</h4>
+                    <h4 class='card-title mb-3'>
+                        Filter
+                    </h4>
 
                     <label class='form-label small'>
                         Radius: {{ state.settings.radiusMi }} mi
@@ -117,7 +123,10 @@
                                 v-text='state.connected ? "Connected" : (state.running ? "Connecting…" : "Stopped")'
                             />
                         </span>
-                        <span class='text-secondary' v-text='state.server.replace("wss://", "")' />
+                        <span
+                            class='text-secondary'
+                            v-text='state.server.replace("wss://", "")'
+                        />
                     </div>
                     <div class='d-flex justify-content-between mt-1 small'>
                         <span>Active strikes: {{ state.strikes.length }}</span>
@@ -131,7 +140,9 @@
                 class='card'
             >
                 <div class='card-body'>
-                    <h4 class='card-title mb-2'>Recent Strikes</h4>
+                    <h4 class='card-title mb-2'>
+                        Recent Strikes
+                    </h4>
                     <div
                         v-for='s in recent'
                         :key='s.id'
