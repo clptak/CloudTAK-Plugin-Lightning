@@ -109,6 +109,14 @@
                         Stop Monitoring
                     </button>
 
+                    <button
+                        v-if='state.running && !isMobile'
+                        class='btn btn-secondary w-100 mt-2'
+                        @click='openHistoryPane()'
+                    >
+                        Show History
+                    </button>
+
                     <div
                         v-if='state.error'
                         class='text-danger small mt-2'
@@ -136,20 +144,15 @@
             </div>
 
             <div
-                v-if='state.strikes.length'
+                v-if='isMobile && state.running'
                 class='card'
             >
-                <div class='card-body'>
-                    <h4 class='card-title mb-2'>
-                        Recent Strikes
+                <div class='card-body p-0'>
+                    <h4 class='card-title mb-0 px-3 pt-3 pb-1'>
+                        Strike History
                     </h4>
-                    <div
-                        v-for='s in recent'
-                        :key='s.id'
-                        class='d-flex justify-content-between small py-1 border-bottom border-secondary'
-                    >
-                        <span v-text='fmtTime(s.timeMs)' />
-                        <span v-text='`${s.distMi.toFixed(1)} mi ${s.compass}`' />
+                    <div class='mobile-history'>
+                        <StrikeHistoryPane />
                     </div>
                 </div>
             </div>
@@ -159,15 +162,21 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { state, start, stop, beginPick, cancelPick, saveSettings, drawFence } from './lightning.ts';
+import { useAppStore } from '../../../src/stores/app.ts';
+import StrikeHistoryPane from './StrikeHistoryPane.vue';
+import {
+    state,
+    start,
+    stop,
+    beginPick,
+    cancelPick,
+    saveSettings,
+    drawFence,
+    openHistoryPane
+} from './lightning.ts';
 
-const recent = computed(() => {
-    return state.strikes.slice(-10).reverse();
-});
-
-function fmtTime(ms: number): string {
-    return new Date(ms).toISOString().substring(11, 19) + 'Z';
-}
+const appStore = useAppStore();
+const isMobile = computed(() => appStore.isMobileDetected);
 
 function onPick(): void {
     if (state.picking) {
@@ -182,3 +191,10 @@ function onSettingsChange(): void {
     drawFence();
 }
 </script>
+
+<style scoped>
+.mobile-history {
+    max-height: 50vh;
+    overflow: hidden;
+}
+</style>

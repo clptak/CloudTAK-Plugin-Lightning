@@ -5,9 +5,11 @@
  * Data: Blitzortung.org & contributors. Non-commercial / entertainment
  * use only — not an authoritative lightning data service.
  */
-import { reactive } from 'vue';
+import { markRaw, reactive } from 'vue';
 import type { PluginAPI } from '../../../plugin.ts';
 import type { GeoJSONSource } from 'maplibre-gl';
+import { useAppStore } from '../../../src/stores/app.ts';
+import { useMapStore } from '../../../src/stores/map.ts';
 
 export interface Strike {
     id: string;
@@ -37,6 +39,13 @@ const SRC_STRIKES = 'plugin-lightning-strikes';
 const SRC_FENCE = 'plugin-lightning-fence';
 const LYR_STRIKES = 'plugin-lightning-strikes-circle';
 const LYR_FENCE = 'plugin-lightning-fence-line';
+const FLOAT_UID = 'lightning-history';
+
+export type Observer = {
+    lat: number;
+    lon: number;
+    source: 'gps' | 'center';
+};
 
 export const state = reactive({
     running: false,
@@ -164,6 +173,73 @@ export function init(pluginAPI: PluginAPI): void {
     api = pluginAPI;
 }
 
+/**
+ * Prefer live device GPS from CloudTAK's map store; fall back to the
+ * configured filter center.
+ */
+export function getObserverLatLon(): Observer | null {
+    if (api) {
+        const gps = useMapStore(api.pinia).gpsCoordinates;
+        if (gps) {
+            return { lat: gps.lat, lon: gps.lng, source: 'gps' };
+        }
+    }
+
+    const { centerLat, centerLon } = state.settings;
+    if (centerLat !== null && centerLon !== null) {
+        return { lat: centerLat, lon: centerLon, source: 'center' };
+    }
+
+    return null;
+}
+
+/** Distance / bearing from the current observer (GPS or center). */
+export function strikeRelative(s: Strike): { distMi: number; compass: string } {
+    const obs = getObserverLatLon();
+    if (!obs) {
+        return { distMi: s.distMi, compass: s.compass };
+    }
+
+    const distM = haversineMeters(obs.lat, obs.lon, s.lat, s.lon);
+    return {
+        distMi: distM / 1609.344,
+        compass: bearingCompass(obs.lat, obs.lon, s.lat, s.lon)
+    };
+}
+
+export function fmtStrikeTime(ms: number): string {
+    return new Date(ms).toISOString().substring(11, 19) + 'Z';
+}
+
+export function isHistoryPaneOpen(): boolean {
+    return !!api && api.float.has(FLOAT_UID);
+}
+
+/** Desktop floating history pane — no-op on mobile (table lives in the menu). */
+export function openHistoryPane(): void {
+    if (!api || api.float.has(FLOAT_UID)) return;
+    if (useAppStore(api.pinia).isMobileDetected) return;
+
+    // Dynamic import avoids a circular dependency with StrikeHistoryPane.vue
+    void import('./StrikeHistoryPane.vue').then((mod) => {
+        if (!api || !state.running || api.float.has(FLOAT_UID)) return;
+        if (useAppStore(api.pinia).isMobileDetected) return;
+
+        api.float.add({
+            uid: FLOAT_UID,
+            name: 'Lightning Strikes',
+            component: markRaw(mod.default),
+            width: 440,
+            height: 380
+        });
+    });
+}
+
+export function closeHistoryPane(): void {
+    if (!api || !api.float.has(FLOAT_UID)) return;
+    api.float.remove(FLOAT_UID);
+}
+
 export function start(): void {
     if (!api) return;
     if (state.settings.centerLat === null || state.settings.centerLon === null) {
@@ -177,6 +253,7 @@ export function start(): void {
     ensureLayers();
     drawFence();
     connect();
+    openHistoryPane();
 
     if (pruneTimer) clearInterval(pruneTimer);
     pruneTimer = setInterval(() => {
@@ -188,6 +265,7 @@ export function start(): void {
 export function stop(): void {
     state.running = false;
     state.connected = false;
+    closeHistoryPane();
 
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
@@ -208,6 +286,7 @@ export function destroy(): void {
     stop();
     cancelPick();
     state.strikes = [];
+    closeHistoryPane();
 
     if (api) {
         const map = api.map;
