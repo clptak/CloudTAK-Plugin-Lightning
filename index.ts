@@ -1,19 +1,13 @@
 import type { App } from 'vue';
-import { h } from 'vue';
+import { h, markRaw } from 'vue';
+import { IconBolt } from '@tabler/icons-vue';
 import type { PluginAPI, PluginInstance } from '../../plugin.ts';
 import { TablerDropdown } from '@tak-ps/vue-tabler';
 import MenuTemplate from './lib/MenuTemplate.vue';
 import LightningContainer from './lib/LightningContainer.vue';
-import IconBoltUrl from './lib/Bolt.svg';
 import { state, init, destroy } from './lib/lightning.ts';
 
-const IconBolt = {
-    render: () => h('img', {
-        src: IconBoltUrl,
-        width: 32,
-        height: 32
-    })
-};
+type MenuItemIconType = NonNullable<Parameters<PluginAPI['menu']['add']>[0]['icon']>;
 
 const ROUTE_NAME = 'home-menu-plugin-lightning';
 const MENU_KEY = 'lightning';
@@ -28,13 +22,12 @@ const LightningBottomBar = {
             class: 'd-flex align-items-center justify-content-center px-2 cursor-pointer cloudtak-hover',
             title: 'Lightning Monitor'
         }, [
-            h('img', {
-                src: IconBoltUrl,
-                width: 28,
-                height: 28,
+            h(IconBolt, {
+                size: 28,
+                stroke: 1.5,
                 style: state.running
-                    ? 'opacity: 0.95;'
-                    : 'filter: grayscale(1); opacity: 0.5;'
+                    ? 'opacity: 0.95; color: #ffd43b;'
+                    : 'opacity: 0.5;'
             }),
             h('span', {
                 class: 'small text-white ps-1'
@@ -90,7 +83,7 @@ export default class Lightning {
             route: ROUTE_NAME,
             tooltip: 'Lightning Monitor',
             description: 'Live Blitzortung strikes within a radius',
-            icon: IconBolt
+            icon: markRaw(IconBolt) as unknown as MenuItemIconType
         });
 
         this.api.bottomBar.add({
