@@ -24,7 +24,7 @@ const LightningBottomBar = {
         }, [
             h(IconBolt, {
                 size: 28,
-                stroke: 1.5,
+                stroke: '1.5',
                 style: state.running
                     ? 'opacity: 0.95; color: #ffd43b;'
                     : 'opacity: 0.5;'
