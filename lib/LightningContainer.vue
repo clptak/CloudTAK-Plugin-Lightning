@@ -162,7 +162,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAppStore } from '../../../src/stores/app.ts';
+import { useAppStore } from '@/stores/app.ts';
 import StrikeHistoryPane from './StrikeHistoryPane.vue';
 import {
     state,

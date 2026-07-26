@@ -62,7 +62,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useMapStore } from '../../../src/stores/map.ts';
+import { useMapStore } from '@/stores/map.ts';
 import {
     state,
     getObserverLatLon,

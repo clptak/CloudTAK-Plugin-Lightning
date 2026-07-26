@@ -8,8 +8,8 @@
 import { markRaw, reactive } from 'vue';
 import type { PluginAPI } from '../../../plugin.ts';
 import type { GeoJSONSource } from 'maplibre-gl';
-import { useAppStore } from '../../../src/stores/app.ts';
-import { useMapStore } from '../../../src/stores/map.ts';
+import { useAppStore } from '@/stores/app.ts';
+import { useMapStore } from '@/stores/map.ts';
 
 export interface Strike {
     id: string;
