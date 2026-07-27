@@ -4,7 +4,8 @@
  */
 import { ingestStrike, state } from './lightning.ts';
 
-const OWM_URL = 'https://api.openweathermap.org/lightning/1.0/data';
+// Lightning product is served from demo.* today; api.* returns 404 for this path.
+const OWM_URL = 'https://demo.openweathermap.org/lightning/1.0/data';
 const POLL_MS = 120_000;
 const WINDOW_MS = 3 * 60 * 1000;
 const MAX_RADIUS_KM = 50;

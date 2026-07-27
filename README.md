@@ -47,14 +47,15 @@ Allow:
 
 - **Blitzortung** websocket hosts (`wss://ws*.blitzortung.org`) — always needed
   while monitoring
-- **OpenWeather** HTTPS API (`https://api.openweathermap.org`) — needed when the
-  optional OpenWeather poll is enabled
+- **OpenWeather** HTTPS API (`https://demo.openweathermap.org`) — needed when the
+  optional OpenWeather poll is enabled (lightning lives on `demo.*`; `api.*`
+  returns 404 for this product)
 
 ### Symptom
 
 Feed stays on **Connecting…**, or OpenWeather polls fail silently. DevTools
 Console shows a `connect-src` violation for `wss://ws*.blitzortung.org` and/or
-`https://api.openweathermap.org`. Local Vite/dev builds often work because they
+`https://demo.openweathermap.org`. Local Vite/dev builds often work because they
 do not serve the production nginx CSP.
 
 ### Fix (per deployment)
@@ -63,7 +64,7 @@ do not serve the production nginx CSP.
 `NGINX_CSP_`, allow the hosts and recreate the API container:
 
 ```bash
-NGINX_CSP_CONNECT_SRC=wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org,https://api.openweathermap.org
+NGINX_CSP_CONNECT_SRC=wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org,https://demo.openweathermap.org
 docker compose up -d cloudtak-api --force-recreate
 ```
 
@@ -72,7 +73,7 @@ Or in compose (avoids editing `.env`):
 ```yaml
 cloudtak-api:
   environment:
-    NGINX_CSP_CONNECT_SRC: wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org,https://api.openweathermap.org
+    NGINX_CSP_CONNECT_SRC: wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org,https://demo.openweathermap.org
 ```
 
 **2. Older CloudTAK (no `NGINX_CSP_` in `nginx.conf.js`)** — the env var is
@@ -84,7 +85,7 @@ cloudtak-api:
   'wss://ws1.blitzortung.org',
   'wss://ws7.blitzortung.org',
   'wss://ws8.blitzortung.org',
-  'https://api.openweathermap.org'
+  'https://demo.openweathermap.org'
 ]
 ```
 
@@ -129,7 +130,7 @@ plugin alone is not enough. After a CloudTAK upgrade, re-check whether the
   (`time` in ns, `lat`, `lon`, ...). Rotates servers and auto-reconnects
   with a 3 s backoff.
 - Optionally polls OpenWeather Lightning
-  (`https://api.openweathermap.org/lightning/1.0/data`) every 2 minutes when
+  (`https://demo.openweathermap.org/lightning/1.0/data`) every 2 minutes when
   enabled with an API key. Query radius is clamped to 50 km; Blitzortung /
   fence keep the full configured radius. History labels each strike’s source.
 - Haversine-filters strikes to the configured radius, then renders them into a
