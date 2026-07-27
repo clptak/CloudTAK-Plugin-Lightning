@@ -12,6 +12,8 @@ import { useAppStore } from '@/stores/app.ts';
 import { useMapStore } from '@/stores/map.ts';
 import { hasSubscribedMission } from './missions.ts';
 
+export type StrikeSource = 'blitzortung' | 'openweather';
+
 export interface Strike {
     id: string;
     lat: number;
@@ -19,6 +21,7 @@ export interface Strike {
     timeMs: number;
     distMi: number;
     compass: string;
+    source: StrikeSource;
 }
 
 export type CotDestination = 'local' | 'mission';
@@ -31,6 +34,8 @@ export interface LightningSettings {
     publishCot: boolean;
     cotDestination: CotDestination;
     missionGuid: string | null;
+    openWeatherEnabled: boolean;
+    openWeatherApiKey: string;
 }
 
 const LS_KEY = 'plugin-lightning-settings';
@@ -59,6 +64,8 @@ export const state = reactive({
     picking: false,
     server: '' as string,
     error: '' as string,
+    openWeatherError: '' as string,
+    openWeatherLastPoll: null as number | null,
     totalSeen: 0,
     strikes: [] as Strike[],
     settings: loadSettings()
@@ -72,7 +79,9 @@ function defaultSettings(): LightningSettings {
         staleSec: 120,
         publishCot: false,
         cotDestination: 'local',
-        missionGuid: null
+        missionGuid: null,
+        openWeatherEnabled: false,
+        openWeatherApiKey: ''
     };
 }
 
@@ -276,12 +285,16 @@ export function start(): void {
     }
 
     state.error = '';
+    state.openWeatherError = '';
     state.running = true;
     saveSettings();
     ensureLayers();
     drawFence();
     connect();
     openHistoryPane();
+    void import('./openweather.ts').then((m) => {
+        m.startOpenWeatherPoll();
+    });
 
     if (pruneTimer) clearInterval(pruneTimer);
     pruneTimer = setInterval(() => {
@@ -294,6 +307,9 @@ export function stop(): void {
     state.running = false;
     state.connected = false;
     closeHistoryPane();
+    void import('./openweather.ts').then((m) => {
+        m.stopOpenWeatherPoll();
+    });
 
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
@@ -381,21 +397,37 @@ function scheduleReconnect(): void {
     }, 3000);
 }
 
-function onStrike(lat: number, lon: number, timeMs: number): void {
+/**
+ * Ingest a strike from Blitzortung or OpenWeather.
+ * Optional `id` skips the default Blitzortung-style id; skips duplicates by id.
+ */
+export function ingestStrike(
+    lat: number,
+    lon: number,
+    timeMs: number,
+    source: StrikeSource,
+    id?: string
+): void {
     const { centerLat, centerLon, radiusMi } = state.settings;
     if (centerLat === null || centerLon === null) return;
 
     const distM = haversineMeters(centerLat, centerLon, lat, lon);
     if (distM > radiusMi * 1609.344) return;
 
+    const strikeId = id
+        ?? `${source}-${timeMs}-${Math.round(lat * 1e4)}-${Math.round(lon * 1e4)}`;
+
+    if (state.strikes.some((s) => s.id === strikeId)) return;
+
     state.totalSeen++;
     const strike: Strike = {
-        id: `${timeMs}-${Math.round(lat * 1e4)}-${Math.round(lon * 1e4)}`,
+        id: strikeId,
         lat,
         lon,
         timeMs,
         distMi: distM / 1609.344,
-        compass: bearingCompass(centerLat, centerLon, lat, lon)
+        compass: bearingCompass(centerLat, centerLon, lat, lon),
+        source
     };
     state.strikes.push(strike);
 
@@ -407,6 +439,10 @@ function onStrike(lat: number, lon: number, timeMs: number): void {
             void m.publishStrikeCot(strike);
         });
     }
+}
+
+function onStrike(lat: number, lon: number, timeMs: number): void {
+    ingestStrike(lat, lon, timeMs, 'blitzortung');
 }
 
 function pruneStrikes(): void {

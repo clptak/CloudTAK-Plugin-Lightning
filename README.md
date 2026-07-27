@@ -13,7 +13,8 @@ Based on the structure of
 - **Center point picker** — "Pick Center on Map" (crosshair + single click) or manual lat/lon entry
 - **Radius** — 5 to 200 mi slider; dashed yellow fence circle drawn on the map
 - **Strike lifetime** — seconds before a strike ages off (default 120 s)
-- Strikes colored by age (white → yellow → orange → dark red) with recent-strike list (time, distance, bearing)
+- Strikes colored by age (white → yellow → orange → dark red) with recent-strike list (time, source, distance, bearing)
+- Optional OpenWeather Lightning poll (every 2 min; API key; 50 km max radius)
 - Bottom-bar bolt icon with live in-radius strike count
 - Settings persisted in browser localStorage
 - Clean teardown on plugin disable (layers, sources, websocket, timers)
@@ -35,17 +36,25 @@ No extra npm dependencies are required — the plugin only uses `vue`,
 `maplibre-gl`, and `@tak-ps/vue-tabler`, all already present in the CloudTAK
 web build.
 
-## ⚠️ Production requirement: CSP allowance for the Blitzortung websocket
+## ⚠️ Production requirement: CSP `connect-src` for lightning feeds
 
 This is a **Content-Security-Policy (CSP)** restriction, **not** CORS, and it
 **cannot** be configured from the CloudTAK UI, admin panel, or this plugin’s
 settings. Plugins are frontend-only; CSP is set by nginx inside `cloudtak-api`
 when the container starts. A browser setting cannot loosen that header.
 
+Allow:
+
+- **Blitzortung** websocket hosts (`wss://ws*.blitzortung.org`) — always needed
+  while monitoring
+- **OpenWeather** HTTPS API (`https://api.openweathermap.org`) — needed when the
+  optional OpenWeather poll is enabled
+
 ### Symptom
 
-Feed stays on **Connecting…**. DevTools Console shows a `connect-src` violation
-for `wss://ws*.blitzortung.org`. Local Vite/dev builds often work because they
+Feed stays on **Connecting…**, or OpenWeather polls fail silently. DevTools
+Console shows a `connect-src` violation for `wss://ws*.blitzortung.org` and/or
+`https://api.openweathermap.org`. Local Vite/dev builds often work because they
 do not serve the production nginx CSP.
 
 ### Fix (per deployment)
@@ -54,7 +63,7 @@ do not serve the production nginx CSP.
 `NGINX_CSP_`, allow the hosts and recreate the API container:
 
 ```bash
-NGINX_CSP_CONNECT_SRC=wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org
+NGINX_CSP_CONNECT_SRC=wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org,https://api.openweathermap.org
 docker compose up -d cloudtak-api --force-recreate
 ```
 
@@ -63,14 +72,20 @@ Or in compose (avoids editing `.env`):
 ```yaml
 cloudtak-api:
   environment:
-    NGINX_CSP_CONNECT_SRC: wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org
+    NGINX_CSP_CONNECT_SRC: wss://ws1.blitzortung.org,wss://ws7.blitzortung.org,wss://ws8.blitzortung.org,https://api.openweathermap.org
 ```
 
 **2. Older CloudTAK (no `NGINX_CSP_` in `nginx.conf.js`)** — the env var is
 **ignored**. Edit `CloudTAK/api/nginx.conf.js` on that host:
 
 ```js
-'connect-src': [`'self'`, 'wss://ws1.blitzortung.org', 'wss://ws7.blitzortung.org', 'wss://ws8.blitzortung.org']
+'connect-src': [
+  `'self'`,
+  'wss://ws1.blitzortung.org',
+  'wss://ws7.blitzortung.org',
+  'wss://ws8.blitzortung.org',
+  'https://api.openweathermap.org'
+]
 ```
 
 Then rebuild and recreate (must not be a fully cached no-op):
@@ -80,7 +95,7 @@ docker compose build cloudtak-api --no-cache
 docker compose up -d cloudtak-api --force-recreate
 ```
 
-**Verify** (must show `blitzortung` in `connect-src`):
+**Verify** (must show `blitzortung` and, if using OpenWeather, `openweathermap` in `connect-src`):
 
 ```bash
 curl -sI https://cloudtak.example.com/ | tr -d '\r' | grep -i content-security-policy
@@ -113,12 +128,15 @@ plugin alone is not enough. After a CloudTAK upgrade, re-check whether the
   handshake, and LZW-decodes each frame into strike JSON
   (`time` in ns, `lat`, `lon`, ...). Rotates servers and auto-reconnects
   with a 3 s backoff.
+- Optionally polls OpenWeather Lightning
+  (`https://api.openweathermap.org/lightning/1.0/data`) every 2 minutes when
+  enabled with an API key. Query radius is clamped to 50 km; Blitzortung /
+  fence keep the full configured radius. History labels each strike’s source.
 - Haversine-filters strikes to the configured radius, then renders them into a
   `plugin-lightning-strikes` GeoJSON source with an age-driven circle layer.
   A 1 Hz timer re-computes age fractions and prunes expired strikes.
-- Nothing is sent to the TAK server — this is client-side situational
-  awareness only. (Server-wide sharing is what the Node-RED → CoT bridge
-  is for.)
+- Optional CoT publish (local or DataSync mission) uses the same ingest path
+  for both sources.
 
 ## Caveats
 

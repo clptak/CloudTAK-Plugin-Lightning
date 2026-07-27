@@ -20,6 +20,9 @@
                             Time
                         </th>
                         <th>
+                            Source
+                        </th>
+                        <th>
                             Coordinates
                         </th>
                         <th class='text-end'>
@@ -30,7 +33,7 @@
                 <tbody>
                     <tr v-if='!rows.length'>
                         <td
-                            colspan='3'
+                            colspan='4'
                             class='text-secondary text-center py-3'
                         >
                             No active strikes in the lifetime window.
@@ -43,6 +46,10 @@
                         <td
                             class='text-nowrap'
                             v-text='fmtStrikeTime(row.timeMs)'
+                        />
+                        <td
+                            class='text-nowrap'
+                            v-text='sourceLabel(row.source)'
                         />
                         <td
                             class='text-nowrap'
@@ -67,7 +74,8 @@ import {
     state,
     getObserverLatLon,
     strikeRelative,
-    fmtStrikeTime
+    fmtStrikeTime,
+    type StrikeSource
 } from './lightning.ts';
 
 const mapStore = useMapStore();
@@ -90,9 +98,14 @@ const rows = computed(() => {
         lat: s.lat,
         lon: s.lon,
         timeMs: s.timeMs,
+        source: s.source,
         ...strikeRelative(s)
     }));
 });
+
+function sourceLabel(source: StrikeSource): string {
+    return source === 'openweather' ? 'OpenWeather' : 'Blitzortung';
+}
 
 function fmtCoords(lat: number, lon: number): string {
     return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;

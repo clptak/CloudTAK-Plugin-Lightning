@@ -94,6 +94,58 @@
             <div class='card mb-3'>
                 <div class='card-body'>
                     <h4 class='card-title mb-3'>
+                        OpenWeather
+                    </h4>
+
+                    <label class='form-check mb-2'>
+                        <input
+                            v-model='state.settings.openWeatherEnabled'
+                            class='form-check-input'
+                            type='checkbox'
+                            :disabled='state.running'
+                            @change='onSettingsChange'
+                        >
+                        <span class='form-check-label'>
+                            Enable OpenWeather poll (every 2 min)
+                        </span>
+                    </label>
+
+                    <div class='mb-2'>
+                        <label class='form-label small'>API key</label>
+                        <input
+                            v-model='state.settings.openWeatherApiKey'
+                            class='form-control'
+                            type='password'
+                            autocomplete='off'
+                            placeholder='OpenWeather API key'
+                            :disabled='state.running'
+                            @change='onSettingsChange'
+                        >
+                    </div>
+
+                    <p class='text-secondary small mb-0'>
+                        OpenWeather radius is capped at 50 km; Blitzortung uses the full radius above.
+                        ~720 calls/day if left on 24 hours (under the free 1,000/day quota).
+                    </p>
+
+                    <div
+                        v-if='state.openWeatherError'
+                        class='text-danger small mt-2'
+                        v-text='state.openWeatherError'
+                    />
+                    <div
+                        v-else-if='state.running && state.settings.openWeatherEnabled && state.openWeatherLastPoll'
+                        class='text-secondary small mt-2'
+                    >
+                        Last OpenWeather poll:
+                        {{ new Date(state.openWeatherLastPoll).toLocaleTimeString() }}
+                    </div>
+                </div>
+            </div>
+
+            <div class='card mb-3'>
+                <div class='card-body'>
+                    <h4 class='card-title mb-3'>
                         CoT Markers
                     </h4>
 
