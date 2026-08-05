@@ -60,7 +60,7 @@ export default class Lightning {
             path: 'plugin-lightning',
             name: ROUTE_NAME,
             component: {
-                render: () => h(MenuTemplate, { name: 'Lightning', backType: 'close' }, {
+                render: () => h(MenuTemplate, { name: 'Lightning' }, {
                     default: () => h(LightningContainer)
                 })
             }

@@ -1,5 +1,5 @@
 <template>
-    <div class='strike-history h-100 d-flex flex-column'>
+    <div class='strike-history d-flex flex-column'>
         <div class='px-2 pt-2 pb-1 small text-secondary d-flex justify-content-between'>
             <span>
                 Relative to
@@ -12,7 +12,7 @@
             <span v-text='`${rows.length} strike(s)`' />
         </div>
 
-        <div class='strike-history-scroll flex-fill px-2 pb-2'>
+        <div class='px-2 pb-2'>
             <table class='table table-sm table-hover mb-0 small align-middle'>
                 <thead class='sticky-top'>
                     <tr>
@@ -113,11 +113,6 @@ function fmtCoords(lat: number, lon: number): string {
 </script>
 
 <style scoped>
-.strike-history-scroll {
-    overflow: auto;
-    min-height: 0;
-}
-
 .strike-history thead th {
     background: var(--tblr-bg-surface, var(--bs-body-bg, #1e1e1e));
     z-index: 1;

@@ -1,5 +1,5 @@
 <template>
-    <div class='card h-100 border-0 bg-transparent'>
+    <div class='card border-0 bg-transparent'>
         <div class='card-body'>
             <div class='card mb-3'>
                 <div class='card-body'>
@@ -284,9 +284,7 @@
                     <h4 class='card-title mb-0 px-3 pt-3 pb-1'>
                         Strike History
                     </h4>
-                    <div class='mobile-history'>
-                        <StrikeHistoryPane />
-                    </div>
+                    <StrikeHistoryPane />
                 </div>
             </div>
         </div>
@@ -375,9 +373,3 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
-.mobile-history {
-    max-height: 50vh;
-    overflow: hidden;
-}
-</style>
